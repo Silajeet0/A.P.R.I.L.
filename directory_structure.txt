@@ -1,0 +1,58 @@
+A.P.R.I.L/
+│
+├── main.py
+├── config/
+│   ├── settings.py
+│   └── prompts.py
+│
+├── core/
+│   ├── orchestrator.py
+│   ├── state.py
+│   └── event_bus.py
+│
+├── agents/
+│   ├── planner_agent.py
+│   ├── executor_agent.py
+│   ├── verifier_agent.py
+│   └── memory_agent.py
+│
+├── graph/
+│   ├── workflow.py
+│   └── nodes/
+│       ├── plan_node.py
+│       ├── execute_node.py
+│       ├── verify_node.py
+│       └── respond_node.py
+│
+├── mcp/
+│   ├── tool_registry.py
+│   ├── schemas.py
+│   └── tools/
+│       ├── system_tools.py
+│       ├── file_tools.py
+│       ├── web_tools.py
+│       └── app_tools.py
+│
+├── voice/
+│   ├── stt.py
+│   ├── tts.py
+│   └── wake_word.py
+│
+├── memory/
+│   ├── short_term.py
+│   ├── long_term.py
+│   └── vector_store.py
+│
+├── llm/
+│   ├── model.py
+│   └── output_parser.py
+│
+├── integrations/
+│   ├── ubuntu_control.py
+│   └── browser.py
+│
+├── utils/
+│   ├── logger.py
+│   └── helpers.py
+│
+└── tests/
