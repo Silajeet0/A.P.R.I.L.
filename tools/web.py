@@ -3,16 +3,21 @@ from ddgs import DDGS
 def web_search(query:str, max_results:int=3)->str:
     print(f"[Tool] Scraping web for: {query}")
     try:
-        res = []
+        formatted_results= []
         with DDGS() as ddgs:
             results = ddgs.text(query, max_results=max_results)
             if not results:
                 return "Query returned no results."
-            else:
-                for r in results:
-                    res.append(f"Title: {r.get('title')}\nSummary: {r.get('body')}\nURL: {r.get('href')}\n")
+            for idx, r in enumerate(results[:3]): 
+                # STARVE THE SNIPPETS: Only extract Title and URL
+                title = r.get('title')
+                url = r.get('href')
+                
+                formatted_results.append(f"[{idx}] TITLE: {title}\nURL: {url}\n")
 
-        return "\n".join(res)
+        return "\n".join(formatted_results)
+        
+        return "\n".join(formatted_results)
 
     except Exception as e:
         return f"Web-search failed withe error: {e}"

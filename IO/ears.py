@@ -11,9 +11,9 @@ openwakeword.utils.download_models()
 
 def wait_for_wake_word():
     """loops silently on the background until the wake word is spoken"""
-    print("\n[System] Microphone is in standby. Say 'Hey Jarvis' to wake...")
+    print("\n[System] Microphone is in standby. Say 'Hey April' to wake...")
 
-    oww_model = Model(wakeword_models=["hey_jarvis"])
+    oww_model = Model(wakeword_models=["../models/hey_april.onnx"], inference_framework="onnx")
 
     aud = pa.PyAudio()
     stream = aud.open(
@@ -30,7 +30,7 @@ def wait_for_wake_word():
             audio_data = np.frombuffer(pcm, dtype=np.int16)
             prediction = oww_model.predict(audio_data)
 
-            if prediction["hey_jarvis"] > 0.5:
+            if prediction["hey_april"] > 0.5:
                 print("\n[System] Wake word detected!")
                 break
     finally:
@@ -101,16 +101,14 @@ def listen():
         else:
             human = False # Force silence, ignore the fan!
 
-        if human:
-            print("!", end="", flush=True) 
+        if human: 
             trigger_counter += 1
             if trigger_counter >= TRIGGER_THRESHOLD:
                 has_spoken = True
             if has_spoken:
                 audio_frames.append(chunk)
                 silence_counter = 0
-        else:
-            print(".", end="", flush=True) 
+        else: 
             trigger_counter = 0
             if has_spoken:
                 audio_frames.append(chunk)
