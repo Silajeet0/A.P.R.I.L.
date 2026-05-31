@@ -4,6 +4,7 @@ import datetime
 from tools.web import web_search
 from tools.weather import weather_tool
 from tools.page_scraper import page_content
+from core.memory import memory_db
 import json
 
 load_dotenv()
@@ -62,10 +63,31 @@ tools_schema = [{
                 "required" : ["url"],
             },
         },
+    },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "update_long_term_memory",
+            "description": "CRITICAL TOOL: Use this whenever the user shares persistent personal info, updates about projects, collaboration milestones, or personal preferences. You MUST process phonetic input and standardize names to clean versions (e.g., 'Howera' -> 'Howrah', 'neurography x' -> 'NeuroGraph-X').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "source_node": {"type": "string", "description": "The standardized noun/entity string."},
+                    "source_label": {"type": "string", "description": "Category label like User, Project, Component, City, Person."},
+                    "relationship": {"type": "string", "description": "The UPPERCASE action verb describing the bond (e.g., WORKS_ON, LIVES_IN, COLLABORATES_WITH)."},
+                    "target_node": {"type": "string", "description": "The target standardized noun/entity string."},
+                    "target_label": {"type": "string", "description": "Category label of the target entity."}
+                },
+                "required": ["source_node", "source_label", "relationship", "target_node", "target_label"]
+            }
+        }
     }
 ]
 
 boot_time = datetime.datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+long_term_facts = memory_db.get_user_context(user="Silajeet")
+
 system_directive = f"""You are A.P.R.I.L., a highly efficient, technical AI voice assistant.
 You are running natively on an 8GB Linux system.
 The current system date and time is: {boot_time}.
@@ -81,10 +103,23 @@ Guidelines:
 - ONLY state the system time if the user explicitly asks "what time is it" or "what is the date".
 - If you run the 'web_search' tool, DO NOT answer the user immediately. You MUST wait, look at the returned URLs, and execute the 'page_content' tool on the best link in the very next turn.
 - CRITICAL: If the user asks a compound question (e.g., weather AND a research topic), you MUST address the weather first in a short opening sentence before providing your research summary. Never omit the weather data. Structure your final response exactly like this: "The weather in [City] is [Data]. Now, regarding [Topic]..."
+=======================================================================
+CRITICAL INSTRUCTION ON LONG-TERM MEMORY ROUTING:
+- You have access to the 'update_long_term_memory' tool. You are MANDATED to call this tool the absolute millisecond the user shares a permanent fact, preference change, relational status, or lifestyle update.
+- If the user says "Call me X", "Remember Y", "I am working on Z", or "My project is W", you are FORBIDDEN from answering via text first. You MUST execute 'update_long_term_memory' to commit the state change to the graph database.
+- Do not merely agree to remember. Write it to the database using the tool.
+=======================================================================
+"""
+
+dynamic_system_prompt = f"""
+{system_directive}
+
+CRITICAL LONG-TERM CONTEXT RETAINED FROM PAST SESSIONS:
+{long_term_facts}
 """
 persistent_mem = [{
     "role" : "system",
-    "content" : system_directive
+    "content" : dynamic_system_prompt
 }]
 
 def think(user_intent : str)->str:
@@ -136,6 +171,23 @@ def think(user_intent : str)->str:
                         tool_result = f"Error: Webpage at {url} refused to load or returned no content. Try scraping a different URL from your search results."
                     else:
                         tool_result = raw_scraped
+            elif func_name == "update_long_term_memory":
+                    print("[A.P.R.I.L.] Attempting to store the directive")
+                    s_node = func_args.get("source_node")
+                    s_label = func_args.get("source_label")
+                    rel = func_args.get("relationship")
+                    t_node = func_args.get("target_node")
+                    t_label = func_args.get("target_label")
+                    
+                    # Call our fresh module
+                    tool_result = memory_db.commit_relationship(
+                        source_node=s_node, 
+                        source_label=s_label, 
+                        relationship=rel, 
+                        target_node=t_node, 
+                        target_label=t_label
+                    )
+                    print(f"\n[Memory Engine] {tool_result}\n")
 
             persistent_mem.append({
                 "role" : "tool",
