@@ -102,7 +102,7 @@ Guidelines:
 - STRICT TOOL CHAINING: If a user asks you to "read the article" or "summarize the page", you are FORBIDDEN from answering using only the web_search snippets. You MUST run web_search, extract the URL, and then use the page_content tool to read the full text before speaking.
 - ONLY state the system time if the user explicitly asks "what time is it" or "what is the date".
 - If you run the 'web_search' tool, DO NOT answer the user immediately. You MUST wait, look at the returned URLs, and execute the 'page_content' tool on the best link in the very next turn.
-- CRITICAL: If the user asks a compound question (e.g., weather AND a research topic), you MUST address the weather first in a short opening sentence before providing your research summary. Never omit the weather data. Structure your final response exactly like this: "The weather in [City] is [Data]. Now, regarding [Topic]..."
+- CRITICAL: - ONLY if the user explicitly combines a question about the weather with another topic in a single turn, address the weather data briefly first. If the user does not ask about the weather, do not mention it.
 =======================================================================
 CRITICAL INSTRUCTION ON LONG-TERM MEMORY ROUTING:
 - You have access to the 'update_long_term_memory' tool. You are MANDATED to call this tool the absolute millisecond the user shares a permanent fact, preference change, relational status, or lifestyle update.
@@ -114,8 +114,14 @@ CRITICAL INSTRUCTION ON LONG-TERM MEMORY ROUTING:
 dynamic_system_prompt = f"""
 {system_directive}
 
-CRITICAL LONG-TERM CONTEXT RETAINED FROM PAST SESSIONS:
+=======================================================================
+CRITICAL LONG-TERM RECALL (FACTS RETAINED FROM PAST SESSIONS):
 {long_term_facts}
+=======================================================================
+
+EXECUTION INSTRUCTIONS:
+1. READ FIRST: Read the long-term recall section above before responding. If a fact, name, project, or title is ALREADY listed in that block, you are strictly FORBIDDEN from calling the 'update_long_term_memory' tool for it. 
+2. Use the data above as your immediate reality. If the data says the user has a relationship PREFERS_TITLE to 'Boss', you must use that title naturally in speech without executing any tools.
 """
 persistent_mem = [{
     "role" : "system",
