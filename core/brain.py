@@ -1,92 +1,19 @@
 from groq import Groq
 from dotenv import load_dotenv
 import datetime
-from tools.web import web_search
-from tools.weather import weather_tool
-from tools.page_scraper import page_content
-from core.memory import memory_db
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 import json
 
 load_dotenv()
 groq_client = Groq()
 
-tools_schema = [{
-        "type":"function",
-        "function":{
-            "name" : "web_search",
-            "description" : "A web search tool that returns ONLY a list of webpage titels and the URL of the corresponding pages for the query. It DOES NOT return the information in the pages linked by those URL. You must use 'page_content' tool in your next turn on a returned URL if you need to summarize or gather information from a page. CRITICAL: Never use this tool for weather data or city forecasts.",
-            "parameters" : {
-                "type" : "object",
-                "properties" : {
-                    "query" : {
-                        "type" : "string",
-                        "description" : "The search query. Keep it short and use keywords."
-                    },
-                },
-                "required" : ["query"],
-            },
-        },
-    },
-
-    {
-        "type" : "function",
-        "function" : {
-            "name" : "weather_tool",
-            "description" : "A tool to search for the weather of the city provided to it. Always choose this tool for weather queries. It is completely self-contained.",
-            "parameters" : {
-                "type" : "object",
-                "properties" : {
-                    "city" : {
-                        "type" : "string",
-                        "description" : "The name of the city whose weather is to be searched for."
-                    },
-                },
-                "required" : ["city"],
-            },
-        },
-    },
-
-    {
-        "type" : "function",
-        "function" : {
-            "name" : "page_content",
-            "description" : "A page scraping tool that scrapes and reads the plain text content from the URL it is handed. Use this tool after using the 'web_search' tool to gather the actual text needed to answer the user queries.",
-            "parameters" : {
-                "type" : "object",
-                "properties" : {
-                    "url" : {
-                        "type" : "string",
-                        "description" : "The URL from which the information is to be extracted."
-                    },
-                },
-
-                "required" : ["url"],
-            },
-        },
-    },
-
-    {
-        "type": "function",
-        "function": {
-            "name": "update_long_term_memory",
-            "description": "CRITICAL TOOL: Use this whenever the user shares persistent personal info, updates about projects, collaboration milestones, or personal preferences. You MUST process phonetic input and standardize names to clean versions (e.g., 'Howera' -> 'Howrah', 'neurography x' -> 'NeuroGraph-X').",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "source_node": {"type": "string", "description": "The standardized noun/entity string."},
-                    "source_label": {"type": "string", "description": "Category label like User, Project, Component, City, Person."},
-                    "relationship": {"type": "string", "description": "The UPPERCASE action verb describing the bond (e.g., WORKS_ON, LIVES_IN, COLLABORATES_WITH)."},
-                    "target_node": {"type": "string", "description": "The target standardized noun/entity string."},
-                    "target_label": {"type": "string", "description": "Category label of the target entity."}
-                },
-                "required": ["source_node", "source_label", "relationship", "target_node", "target_label"]
-            }
-        }
-    }
-]
+server_params = StdioServerParameters(
+     command = "python",
+     args = ["mcp_servers/mcp_memory_server.py"]
+)
 
 boot_time = datetime.datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
-long_term_facts = memory_db.get_user_context(user="Silajeet")
 
 system_directive = f"""You are A.P.R.I.L., a highly efficient, technical AI voice assistant.
 You are running natively on an 8GB Linux system.
@@ -111,108 +38,69 @@ CRITICAL INSTRUCTION ON LONG-TERM MEMORY ROUTING:
 =======================================================================
 """
 
-dynamic_system_prompt = f"""
-{system_directive}
+class AprilBrain:
+    def __init__(self):
+        self.persistent_mem = []
+        self.available_tools = []
+    
+    async def initialize_cognitive_layers(self):
+        """Runs once on application boot to hydrate state from MCP servers"""
 
-=======================================================================
-CRITICAL LONG-TERM RECALL (FACTS RETAINED FROM PAST SESSIONS):
-{long_term_facts}
-=======================================================================
+        print("[Brain] Booting channels to MCP servers...")
+        async with stdio_client(server_params) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
 
-EXECUTION INSTRUCTIONS:
-1. READ FIRST: Read the long-term recall section above before responding. If a fact, name, project, or title is ALREADY listed in that block, you are strictly FORBIDDEN from calling the 'update_long_term_memory' tool for it. 
-2. Use the data above as your immediate reality. If the data says the user has a relationship PREFERS_TITLE to 'Boss', you must use that title naturally in speech without executing any tools.
-"""
-persistent_mem = [{
-    "role" : "system",
-    "content" : dynamic_system_prompt
-}]
+                context_response = await session.call_tool("get_user_context", arguments={"user" : "Silajeet"})
+                long_term_context = context_response.content[0].text
 
-def think(user_intent : str)->str:
-    global persistent_mem
+                tools_data = await session.list_tools()
 
-    #sliding window so that the model forgets older context cleanly
-    if len(persistent_mem) > 11:
-        persistent_mem = [persistent_mem[0]] + persistent_mem[-10:]
+                self.available_tools = [tool.model_dump() for tool in tools_data.tools]
 
-    #append current context to existing ones
-    persistent_mem.append({"role" : "user", "content" : user_intent})
+                hydrated_prompt = f"{system_directive}\n\nLONG-TERM RECALL:\n{long_term_context}"
+                self.persistent_mem = [{"role" : "system", "content" : hydrated_prompt}]
+        print("[Brain] Cognitive synchronization complete.")
 
-    for _ in range(5):
+    async def think(self, user_input:str)->str:
+        """The core execution loop. Handles LLM evaluation and universal tool execution"""
+
+        self.persistent_mem.append({"role" : "user", "content" : user_input})
+        if len(self.persistent_mem) > 11:
+            self.persistent_mem = [self.persistent_mem[0]] + self.persistent_mem[-10:]
+
+        print("\n[A.P.R.I.L.] Thinking...]")
 
         response = groq_client.chat.completions.create(
             model="llama-3.1-8b-instant",
-            messages = persistent_mem,
+            messages = self.persistent_mem,
+            tools = self.available_tools,
             temperature = 0.7,
-            tools = tools_schema,
             tool_choice = "auto"
         )
+        response_message = response.choices[0].message
+        if response_message.tool_calls:
+            self.persistent_mem.append(response_message)
+            for tool_call in response_message.tool_calls:
+                print(f"[A.P.R.I.L.] Exwcuting MCP Tool: {tool_call.name}")
+                async with stdio_client(server_params) as (read_stream, write_stream):
+                    async with ClientSession(read_stream, write_stream) as session:
+                        await session.initialize()
+                        tool_result = await session.call_tool(tool_call.name, arguments=tool_call.arguments)
+                        raw_result_text = tool_result.content[0].text
+                        print(f"[Result] {raw_result_text}")
 
-        message = response.choices[0].message
-
-        if message.tool_calls:
-            persistent_mem.append(message)
-            
-            # CRITICAL CHANGE: Only process the FIRST tool call requested this turn!
-            tool_called = message.tool_calls[0]
-            
-            func_name = tool_called.function.name
-            func_args = json.loads(tool_called.function.arguments)
-            tool_result = ""
-
-            if func_name == "web_search":
-                query = func_args.get("query")
-                tool_result = web_search(query=query)
-
-            elif func_name == "weather_tool":
-                city = func_args.get("city")
-                tool_result = weather_tool(city=city)
-
-            elif func_name == "page_content":
-                    url = func_args.get("url")
-                    print(f"\n[DEBUG] A.P.R.I.L. is reading: {url}\n")
-                    raw_scraped = page_content(url=url)
-                
-                    if not raw_scraped or len(raw_scraped.strip()) < 100:
-                        tool_result = f"Error: Webpage at {url} refused to load or returned no content. Try scraping a different URL from your search results."
-                    else:
-                        tool_result = raw_scraped
-            elif func_name == "update_long_term_memory":
-                    print("[A.P.R.I.L.] Attempting to store the directive")
-                    s_node = func_args.get("source_node")
-                    s_label = func_args.get("source_label")
-                    rel = func_args.get("relationship")
-                    t_node = func_args.get("target_node")
-                    t_label = func_args.get("target_label")
-                    
-                    # Call our fresh module
-                    tool_result = memory_db.commit_relationship(
-                        source_node=s_node, 
-                        source_label=s_label, 
-                        relationship=rel, 
-                        target_node=t_node, 
-                        target_label=t_label
-                    )
-                    print(f"\n[Memory Engine] {tool_result}\n")
-
-            persistent_mem.append({
-                "role" : "tool",
-                "tool_call_id" : tool_called.id,
-                "content" : tool_result
-            })
-            
-            # We break out immediately and let her think about this ONE piece of data 
-            # before she moves on to the next tool!
-            continue
+                        self.persistent_mem.append({
+                            "role" : "tool",
+                            "name" : tool_call.name,
+                            "tool_call_id" : tool_call.id,
+                            "content" : raw_result_text
+                        })
+            response = groq_client.chat.completions.create(model="llama-3.1-8b-instant",
+                                                          messages=self.persistent_mem)
+            assistant_reply = response.choices[0].message.content
         else:
-            model_answer = message.content
-            persistent_mem.append({"role": "assistant",
-                                   "content" : model_answer})
-            return model_answer
-
-
-    return "I'm sorry, my core logic got caught in a loop while researching."
-
-if __name__ == "__main__":
-    answer = think("Hello A.P.R.I.L. are your systems live ?")
-    print(f"[A.P.R.I.L.] : {answer}")
+            assistant_reply = response_message.content
+        self.persistent_mem.append({"role" : "assistant", "content" : assistant_reply})
+        return assistant_reply
+            
