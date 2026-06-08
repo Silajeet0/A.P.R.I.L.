@@ -6,14 +6,19 @@ import re
 import openwakeword
 from openwakeword.model import Model
 import numpy as np
+import os
 
 openwakeword.utils.download_models()
 
 def wait_for_wake_word():
     """loops silently on the background until the wake word is spoken"""
+
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    WAKE_WORD_MODEL_PATH = os.path.join(BASE_DIR, "models", "hey_april.onnx")
+    
     print("\n[System] Microphone is in standby. Say 'Hey April' to wake...")
 
-    oww_model = Model(wakeword_models=["../models/hey_april.onnx"], inference_framework="onnx")
+    oww_model = Model(wakeword_models=[WAKE_WORD_MODEL_PATH], inference_framework="onnx")
 
     aud = pa.PyAudio()
     stream = aud.open(

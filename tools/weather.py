@@ -12,7 +12,7 @@ async def get_weather(city:str)->str:
                      f"(feels like {weather.feels_like} degrees C). "
                      f"Humidity is at {weather.humidity} percent, "
                      f"Pressure is {weather.pressure}, "
-                     f"and wind speed is {weather.wind_speed} kilometer per hour, "
+                     f"and wind speed is {weather.wind_speed} kilometers per hour, "
                      f"Amount of Precipitation: {weather.precipitation}. "
                 )
 

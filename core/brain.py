@@ -41,9 +41,9 @@ Guidelines:
 - CRITICAL: - ONLY if the user explicitly combines a question about the weather with another topic in a single turn, address the weather data briefly first. If the user does not ask about the weather, do not mention it.
 =======================================================================
 CRITICAL INSTRUCTION ON LONG-TERM MEMORY ROUTING:
-- You have access to the 'update_long_term_memory' tool. You are MANDATED to call this tool the absolute millisecond the user shares a permanent fact, preference change, relational status, or lifestyle update.
-- If the user says "Call me X", "Remember Y", "I am working on Z", or "My project is W", you are FORBIDDEN from answering via text first. You MUST execute 'update_long_term_memory' to commit the state change to the graph database.
-- Do not merely agree to remember. Write it to the database using the tool.
+- You have access to the 'update_long_term_memory' tool. ONLY execute this tool if the user explicitly introduces NEW permanent information, preference modifications, or status updates (e.g., "I am starting a new project called X", "Remember that I don't like Y", "Call me Z").
+- If the user is asking a direct question about past events, your identity, or their personal details (e.g., "What is my name?", "What project am I working on?", "What do you know about me?"), DO NOT run the update tool. Simply read the facts directly from the 'LONG-TERM RECALL' log below and speak the answer conversational paragraphs immediately.
+- Never output raw function brackets, JSON blocks, or XML markup tags into your spoken text dialog.
 =======================================================================
 """
 
@@ -97,46 +97,54 @@ class AprilBrain:
         if len(self.persistent_mem) > 11:
             self.persistent_mem = [self.persistent_mem[0]] + self.persistent_mem[-10:]
 
-        print("\n[A.P.R.I.L.] Thinking...")
 
-        response = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=self.persistent_mem,
-            tools=self.available_tools if self.available_tools else None,
-            temperature=0.7,
-            tool_choice="auto"
-        )
+        try:
+            response = groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=self.persistent_mem,
+                tools=self.available_tools if self.available_tools else None,
+                temperature=0.7,
+                tool_choice="auto"
+            )
+        except Exception as api_err:
+            print(f"[Groq API Error] API generation failed: {api_err}")
+            # Failsafe recovery response so the audio loops keep spinning
+            return "I am sorry, my inference layer encountered a formatting error. Could you repeat that?"
+
+        response_message = response.choices[0].message
         response_message = response.choices[0].message
         
         if response_message.tool_calls:
             self.persistent_mem.append(response_message)
             for tool_call in response_message.tool_calls:
-                print(f"[A.P.R.I.L.] Executing MCP Tool: {tool_call.name}")
+                tool_name = tool_call.function.name
+                print(f"[A.P.R.I.L.] Executing MCP Tool: {tool_name}")
                 
                 # Dynamic Session Routing Lookup
                 target_session = None
-                if tool_call.name in ["get_user_context", "update_long_term_memory"]:
+                if tool_name in ["get_user_context", "update_long_term_memory"]:
                     target_session = self.server_sessions.get("memory")
-                elif tool_call.name in ["web_search", "page_content"]:
+                elif tool_name in ["web_search", "page_content"]:
                     target_session = self.server_sessions.get("web")
                 
                 if not target_session:
-                    print(f"[Error] No active server session mapped for tool: {tool_call.name}")
+                    print(f"[Error] No active server session mapped for tool: {tool_name}")
                     continue
                 
                 try:
-                    tool_result = await target_session.call_tool(tool_call.name, arguments=tool_call.arguments)
+                    tool_args = json.loads(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
+                    tool_result = await target_session.call_tool(tool_name, arguments=tool_args)
                     raw_result_text = tool_result.content[0].text
                     print(f"[Result] {raw_result_text}")
 
                     self.persistent_mem.append({
                         "role": "tool",
-                        "name": tool_call.name,
+                        "name": tool_name,
                         "tool_call_id": tool_call.id,
                         "content": raw_result_text
                     })
                 except Exception as tool_err:
-                    print(f"[Execution Error] Failed calling tool '{tool_call.name}': {tool_err}")
+                    print(f"[Execution Error] Failed calling tool '{tool_name}': {tool_err}")
             
             secondary_response = groq_client.chat.completions.create(
                 model="llama-3.1-8b-instant",

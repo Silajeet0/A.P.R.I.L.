@@ -1,8 +1,16 @@
 import asyncio
 from mcp.server.models import InitializationOptions
 import mcp.types as types
-from mcp.server import Notification, Server
+from mcp.server import Server
 import mcp.server.stdio
+
+import os
+import sys
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from core.memory import memory_db
 
 server = Server("april-long-term-memory")
@@ -80,11 +88,10 @@ async def main():
             InitializationOptions(
                 server_name = "apri-long-term-memory",
                 server_version = "1.0.0",
-                capabilities = server.get_capabilities(
-                    notification_options = Notification(),
-                    experimental_capabilities = {},
-                ),
-            ),
+                capabilities=types.ServerCapabilities(
+                    tools=types.ToolsCapability(listChanged=False)
+                )
+            )
         )
 
 if __name__ == "__main__":

@@ -1,12 +1,19 @@
 import asyncio
-from mcp.server import Server, Notification
+from mcp.server import Server
 from mcp.server.models import InitializationOptions
 import mcp.types as types
 import mcp.server.stdio
+import os
+import sys
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from tools.page_scraper import page_content
 from tools.web import web_search
 from tools.weather import get_weather
+
 server = Server("april-web-intelligence")
 
 @server.list_tools()
@@ -95,9 +102,11 @@ async def main():
             InitializationOptions(
                 server_name = "april-web-intelligence",
                 server_version="1.0.0",
-                capabilities = server.get_capabilities(
-                    notification_options = Notification(),
-                    experimental_capabilities = {}
+                capabilities=types.ServerCapabilities(
+                    tools=types.ToolsCapability(listChanged=False)
                 )
             )
         )
+
+if __name__ == "__main__":
+    asyncio.run(main())
