@@ -16,10 +16,21 @@ ALL_SERVERS = {
         command="python",
         args=["mcp_servers/mcp_memory_server.py"]
     ),
+
     "web": StdioServerParameters(
         command="python",
         args=["mcp_servers/mcp_web_server.py"]
+    ),
+
+    "filesystem": StdioServerParameters(
+      command = "npx",
+      args = [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/silajeet0/workspace"
+      ]
     )
+
 }
 
 boot_time = datetime.datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
@@ -45,6 +56,12 @@ CRITICAL INSTRUCTION ON LONG-TERM MEMORY ROUTING:
 - If the user is asking a direct question about past events, your identity, or their personal details (e.g., "What is my name?", "What project am I working on?", "What do you know about me?"), DO NOT run the update tool. Simply read the facts directly from the 'LONG-TERM RECALL' log below and speak the answer conversational paragraphs immediately.
 - Never output raw function brackets, JSON blocks, or XML markup tags into your spoken text dialog.
 =======================================================================
+CRITICAL ENVIRONMENT PATH CONSTRAINTS:
+- Your local filesystem sandboxed root is explicitly: /home/silajeet0/workspace
+- Whenever the user says "current directory", "workspace", "here", or "the folders", you MUST interpret this as the absolute path: /home/silajeet0/workspace
+- You are strictly forbidden from passing root directories like "/", "/workspace", or "/home/silajeet0" to filesystem tools. Always prefix your path arguments with /home/silajeet0/workspace.
+- If a tool requires "No input" or an empty schema (like 'list_allowed_directories'), you are MANDATED to pass an empty dictionary object "{{}}" as the arguments parameter. Never leave the arguments property undefined.
+========================================================================
 """
 
 class AprilBrain:
@@ -126,6 +143,9 @@ class AprilBrain:
                     target_session = self.server_sessions.get("memory")
                 elif tool_name in ["web_search", "page_content"]:
                     target_session = self.server_sessions.get("web")
+                elif tool_name in ["read_text_file", "read_media_file", "read_multiple_files", "write_file", "edit_file", "create_directory",
+                                   "list_directory", "list_directory_with_sizes", "move_file", "search_files", "directory_tree", "get_file_info", "list_allowed_directories"]:
+                    target_session = self.server_sessions.get("filesystem")
                 
                 if not target_session:
                     print(f"[Error] No active server session mapped for tool: {tool_name}")
