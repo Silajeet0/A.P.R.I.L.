@@ -1,0 +1,14 @@
+beautifulsoup4==4.15.0
+ddgs==9.14.4
+groq==1.4.0
+kokoro==0.9.4
+mcp==1.28.0
+neo4j==6.2.0
+numpy==2.4.6
+#openwakeword==0.6.0
+pyaudio==0.2.14
+python-dotenv==1.2.2
+python_weather==2.2.2
+Requests==2.34.2
+sounddevice==0.5.5
+webrtcvad==2.0.10
