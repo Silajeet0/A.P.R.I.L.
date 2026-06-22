@@ -12,3 +12,6 @@ python_weather==2.2.2
 Requests==2.34.2
 sounddevice==0.5.5
 webrtcvad==2.0.10
+onnxruntime
+scipy
+scikit-learn

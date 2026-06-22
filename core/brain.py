@@ -141,7 +141,7 @@ class AprilBrain:
                 target_session = None
                 if tool_name in ["get_user_context", "update_long_term_memory"]:
                     target_session = self.server_sessions.get("memory")
-                elif tool_name in ["web_search", "page_content"]:
+                elif tool_name in ["web_search", "page_content", "get_weather"]:
                     target_session = self.server_sessions.get("web")
                 elif tool_name in ["read_text_file", "read_media_file", "read_multiple_files", "write_file", "edit_file", "create_directory",
                                    "list_directory", "list_directory_with_sizes", "move_file", "search_files", "directory_tree", "get_file_info", "list_allowed_directories"]:
